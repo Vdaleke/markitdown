@@ -35,6 +35,13 @@ JPG_TEST_EXIFTOOL = {
     "DateTimeOriginal": "2024:03:14 22:10:00",
 }
 
+JPG_OCR_TEST_STRINGS = {
+    "AutoGen: Enabling Next-Gen LLM",
+    "Applications via Multi-Agent Conversation",
+    "Figure 1: AutoGen enables diverse LLM-based",
+    "AutoGen agents are customizable; conversable, and can operate in",
+}
+
 PDF_TEST_URL = "https://arxiv.org/pdf/2308.08155v2.pdf"
 PDF_TEST_STRINGS = [
     "While there is contemporaneous exploration of multi-agent approaches"
@@ -358,11 +365,19 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+def test_markitdown_ocr() -> None:
+    markitdown = MarkItDown(ocr_client="easyocr")
+    result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
+    
+    for test_string in JPG_OCR_TEST_STRINGS:
+        assert test_string in result.text_content
+
 
 if __name__ == "__main__":
     """Runs this file's tests from the command line."""
     # test_markitdown_remote()
     # test_markitdown_local()
-    test_markitdown_exiftool()
+    # test_markitdown_exiftool()
     # test_markitdown_deprecation()
     # test_markitdown_llm()
+    test_markitdown_ocr()
