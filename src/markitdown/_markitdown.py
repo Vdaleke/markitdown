@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse, urlunparse
 from warnings import warn, resetwarnings, catch_warnings
+from abc import ABC, abstractmethod
 
 import mammoth
 import markdownify
@@ -1041,6 +1042,13 @@ class Mp3Converter(WavConverter):
             text_content=md_content.strip(),
         )
 
+class OCRClient(ABC):
+    """
+    Abstract class for OCR clients.
+    """
+    @abstractmethod
+    def readtext(self, local_path) -> List[tuple[Any, str, Any]]:
+        pass
 
 class ImageConverter(MediaConverter):
     """
@@ -1088,23 +1096,22 @@ class ImageConverter(MediaConverter):
                 ).strip()
                 + "\n"
             )
-
-        # Use OCR if LLM is not available
-        ocr_client = kwargs.get("ocr_client", "easyocr")
-        if llm_client is None or llm_model is None:
-            if ocr_client == "easyocr" and IS_EASYOCR_CAPABLE:
-                reader = easyocr.Reader(
-                    lang_list=kwargs.get("ocr_languages", ["en", "ru"]),
-                    gpu=kwargs.get("ocr_on_gpu", False),
-                ) 
-                ocr_result = reader.readtext(local_path)
+        else: 
+            # Use OCR if LLM is not available
+            ocr_client = kwargs.get("ocr_client")
+            if ocr_client is None and IS_EASYOCR_CAPABLE:
+                ocr_client = easyocr.Reader(
+                        lang_list=["en", "ru"],
+                        gpu=False,
+                    ) 
+            
+            if ocr_client is not None:
+                ocr_result = ocr_client.readtext(local_path)
                 if ocr_result:
                     md_content += "\n# Text:\n"
                     for detection in ocr_result:
                         text = detection[1]  # extract text
                         md_content += f"- {text}\n"
-            else: 
-                raise ValueError(f"Unsupported OCR client: {ocr_client}")
 
         return DocumentConverterResult(
             title=None,
@@ -1363,9 +1370,7 @@ class MarkItDown:
         llm_model: Optional[str] = None,
         style_map: Optional[str] = None,
         exiftool_path: Optional[str] = None,
-        ocr_client: Optional[Any] = None,
-        ocr_languages: Optional[List[str]] = None,
-        ocr_on_gpu: Optional[bool] = None,
+        ocr_client: Optional[OCRClient] = None,
         # Deprecated
         mlm_client: Optional[Any] = None,
         mlm_model: Optional[str] = None,
@@ -1412,8 +1417,6 @@ class MarkItDown:
         self._style_map = style_map
         self._exiftool_path = exiftool_path
         self._ocr_client = ocr_client
-        self._ocr_languages = ocr_languages
-        self._ocr_on_gpu = ocr_on_gpu
 
         self._page_converters: List[DocumentConverter] = []
 
@@ -1605,12 +1608,6 @@ class MarkItDown:
 
                 if "ocr_client" not in _kwargs and self._ocr_client is not None:
                     _kwargs["ocr_client"] = self._ocr_client
-
-                if "ocr_languages" not in _kwargs and self._ocr_languages is not None:
-                    _kwargs["ocr_languages"] = self._ocr_languages
-
-                if "ocr_on_gpu" not in _kwargs and self._ocr_on_gpu is not None:
-                    _kwargs["ocr_on_gpu"] = self._ocr_on_gpu
 
                 # Add the list of converters for nested processing
                 _kwargs["_parent_converters"] = self._page_converters

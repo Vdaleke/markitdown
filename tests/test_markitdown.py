@@ -25,6 +25,12 @@ except ModuleNotFoundError:
 # Skip exiftool tests if not installed
 skip_exiftool = shutil.which("exiftool") is None
 
+skip_ocr = False
+try:
+    import easyocr
+except ModuleNotFoundError:
+    skip_ocr = True
+
 TEST_FILES_DIR = os.path.join(os.path.dirname(__file__), "test_files")
 
 JPG_TEST_EXIFTOOL = {
@@ -365,8 +371,12 @@ def test_markitdown_llm() -> None:
     for test_string in ["red", "circle", "blue", "square"]:
         assert test_string in result.text_content.lower()
 
+@pytest.mark.skipif(
+    skip_ocr,
+    reason="do not run ocr tests without easyocr",
+)
 def test_markitdown_ocr() -> None:
-    markitdown = MarkItDown(ocr_client="easyocr")
+    markitdown = MarkItDown(ocr_client=easyocr.Reader(lang_list=["en", "ru"], gpu=False))
     result = markitdown.convert(os.path.join(TEST_FILES_DIR, "test.jpg"))
     
     for test_string in JPG_OCR_TEST_STRINGS:
